@@ -189,6 +189,9 @@ class Poloniex(object):
 		self.APIKey = APIKey
 		self.Secret = Secret.encode('utf8')
 		self.timeout = timeout
+		self._callTimes = []
+		self._timeFrame = 1.0
+		self._callLimit = 6
 		self.MINUTE, self.HOUR, self.DAY, self.WEEK, self.MONTH, self.YEAR = [60, 60*60, 60*60*24, 60*60*24*7, 60*60*24*30, 60*60*24*365]
 		# Convertions
 		self.epoch2UTCstr = lambda timestamp=time.time(), fmat="%Y-%m-%d %H:%M:%S": time.strftime(fmat, time.gmtime(timestamp))
@@ -231,6 +234,23 @@ class Poloniex(object):
 		self.withdraw = lambda coin, amount, address: self.api('withdraw', {'currency':str(coin), 'amount':str(amount), 'address':str(address)})
 		self.transferBalance = lambda coin, amount, fromac, toac: self.api('transferBalance', {'currency':str(coin), 'amount':str(amount), 'fromAccount':str(fromac), 'toAccount':str(toac)})
 		
+	def _apiCoach(self):
+		"""
+		Make sure the api calls don't go over the limit (or at least try to)...
+		"""
+		now = time.time() # what time is it?
+		if len(self._callTimes) == 0 or (now - self._callTimes[-1]) >= self._timeFrame: # if it's your turn
+			self._callTimes.insert(0, now) # add 'now' to the front of 'callTimes', pushing other times back
+			if len(self._callTimes) > self._callLimit: # if 'callTimes' list is larger than 'callLimit'
+				self._callTimes.pop() # remove the oldest time
+		else:
+			time.sleep(self._timeFrame-(now - self._callTimes[-1])) # wait your turn...
+			now = time.time() # look at watch, again...
+			self._callTimes.insert(0, now) # add 'now' to the front of 'callTimes', pushing other times back
+				if len(self._callTimes) > self._callLimit: # if 'callTimes' list is larger than 'callLimit'
+					self._callTimes.pop() # remove the oldest time
+		return now
+	
 	def api(self, command, args={}):
 		"""
 		Main Api Function
@@ -240,22 +260,22 @@ class Poloniex(object):
 		- sends url encoded string to API server, returns decoded json response
 		- returns {"error":"<error message>"} if API error
 		"""
+		now = self._apiCoach() # check in with the coach
 		args['command'] = command
-		global PUBLIC_COMMANDS
-		global PRIVATE_COMMANDS
+		global PUBLIC_COMMANDS;global PRIVATE_COMMANDS
 		if command in PRIVATE_COMMANDS:
 			if len(self.APIKey) < 2 or len(self.Secret) < 2:
-				print("An APIKey and Secret is needed!");return False
-			url, args['nonce'] = ['https://poloniex.com/tradingApi', int(time.time()*42)]
+				raise ValueError("An APIKey and Secret is needed for private api commands!")
+			args['nonce'] = int(now*42)
 			post_data = urlencode(args)
 			sign = hmac.new(self.Secret, post_data.encode('utf-8'), hashlib.sha512).hexdigest()
 			headers = {'Sign': sign, 'Key': self.APIKey}
 			ret = requests.post('https://poloniex.com/tradingApi', data=args, headers=headers, timeout=self.timeout)
 			return json.loads(ret.text)
-					
+		
 		elif command in PUBLIC_COMMANDS:
-			url = 'https://poloniex.com/public?'
-			ret = requests.post(url + urlencode(args), timeout=self.timeout)
+			ret = requests.post('https://poloniex.com/public?' + urlencode(args), timeout=self.timeout)
 			return json.loads(ret.text)
-			
-		else:return False
+		
+		else:
+			raise ValueError("Invalid Command!")
