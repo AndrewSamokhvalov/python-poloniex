@@ -241,18 +241,20 @@ class Poloniex(object):
 		now = time.time() # what time is it?
 		print(self._callTimes)
 		if len(self._callTimes) == 0 or (now - self._callTimes[-1]) >= self._timeFrame: # if it's your turn
-			print("Now: %s  Oldest Call: %s  Diff: %f sec" % (self.epoch2UTCstr(now, "%H:%M:%S.%f"), self.epoch2UTCstr(self._callTimes[-1], "%H:%M:%S.%f"), now - self._callTimes[-1]))
 			self._callTimes.insert(0, now) # add 'now' to the front of 'callTimes', pushing other times back
+			print("Now: %s  Oldest Call: %s  Diff: %f sec" % (now, self._callTimes[-1], now - self._callTimes[-1]))
 			if len(self._callTimes) > self._callLimit: # if 'callTimes' list is larger than 'callLimit'
 				self._callTimes.pop() # remove the oldest time
+			return now
 		else:
-			print("Waiting %f sec..." % self._timeFrame-(now - self._callTimes[-1]))
+			print("Now: %s  Oldest Call: %s  Diff: %f sec" % (now, self._callTimes[-1], now - self._callTimes[-1]))
+			print("Waiting %s sec..." % str(self._timeFrame-(now - self._callTimes[-1])))
 			time.sleep(self._timeFrame-(now - self._callTimes[-1])) # wait your turn... (maxTime - (now - oldest)) = time left to wait
 			now = time.time() # look at watch, again...
 			self._callTimes.insert(0, now) # add 'now' to the front of 'callTimes', pushing other times back
-				if len(self._callTimes) > self._callLimit: # if 'callTimes' list is larger than 'callLimit'
-					self._callTimes.pop() # remove the oldest time
-		return now
+			if len(self._callTimes) > self._callLimit: # if 'callTimes' list is larger than 'callLimit'
+				self._callTimes.pop() # remove the oldest time
+			return now
 	
 	def api(self, command, args={}):
 		"""
