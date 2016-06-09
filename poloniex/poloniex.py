@@ -32,8 +32,9 @@ PRIVATE_COMMANDS = [
 	'returnTradeHistory', 
 	'returnAvailableAccountBalances', 
 	'returnTradableBalances', 
-	'returnOpenLoanOffers', 
-	'returnActiveLoans', 
+	'returnOpenLoanOffers',
+	'returnOrderTrades',
+	'returnActiveLoans',
 	'createLoanOffer', 
 	'cancelLoanOffer', 
 	'toggleAutoRenew', 
@@ -42,6 +43,7 @@ PRIVATE_COMMANDS = [
 	'cancelOrder', 
 	'moveOrder', 
 	'withdraw', 
+	'returnFeeInfo', 
 	'transferBalance', 
 	'returnMarginAccountSummary', 
 	'marginBuy', 
@@ -149,7 +151,10 @@ class Poloniex(object):
 		
 		self.myOpenLoanOrders() == self.api('returnOpenLoanOffers')
 		- returns your open loan offers
-	
+		
+		self.orderTrades == self.api('returnOrderTrades',{'orderNumber':str(orderId)})
+		- returns any trades made from <orderId>
+		
 		self.createLoanOrder(coin, amount, rate) == self.api('createLoanOffer', {'currency' :<coin>, 'amount':<amount>, 'duration':2, 'autoRenew':0, 'lendingRate':<rate>})
 		- creates a loan offer for <coin> for <amount> at <rate>
 		
@@ -182,6 +187,9 @@ class Poloniex(object):
 		
 		self.withdraw(coin, amount, address) == self.api('withdraw', {'currency':<coin>, 'amount':<amount>, 'address':<address>})
 		- withdraws <coin> <amount> to <address>
+
+		self.returnFeeInfo() == self.api('returnFeeInfo')
+                - return current trading fees and trailing 30-day volume in BTC
 		
 		self.transferBalance(coin, amount, fromac, toac) == self.api('transferBalance', {'currency':<coin>, 'amount':<amount>, 'fromAccount':<fromac>, 'toAccount':<toac>})
 		- moves <coin> <amount> from <fromac> to <toac>
@@ -220,7 +228,9 @@ class Poloniex(object):
 		self.myTradeableBalances = lambda x=0: self.api('returnTradableBalances')
 		self.myActiveLoans = lambda x=0: self.api('returnActiveLoans')
 		self.myOpenLoanOrders = lambda x=0: self.api('returnOpenLoanOffers')
+		
 		## Trading functions ##
+		self.orderTrades = lambda orderId: self.api('returnOrderTrades',{'orderNumber':str(orderId)})
 		self.createLoanOrder = lambda coin, amount, rate: self.api('createLoanOffer', {'currency' :str(coin), 'amount':str(amount), 'duration':str(2), 'autoRenew':str(0), 'lendingRate':str(rate)})
 		self.cancelLoanOrder = lambda orderId: self.api('cancelLoanOffer', {'orderNumber':str(orderId)})
 		self.toggleAutoRenew = lambda orderId: self.api('toggleAutoRenew', {'orderNumber':str(orderId)})
@@ -232,6 +242,7 @@ class Poloniex(object):
 		self.cancelOrder = lambda orderId: self.api('cancelOrder', {'orderNumber':str(orderId)})
 		self.moveOrder = lambda orderId, rate, amount: self.api('moveOrder', {'orderNumber':str(orderId), 'rate':str(rate), 'amount':str(amount)})
 		self.withdraw = lambda coin, amount, address: self.api('withdraw', {'currency':str(coin), 'amount':str(amount), 'address':str(address)})
+		self.returnFeeInfo = lambda x=0: self.api('returnFeeInfo')
 		self.transferBalance = lambda coin, amount, fromac, toac: self.api('transferBalance', {'currency':str(coin), 'amount':str(amount), 'fromAccount':str(fromac), 'toAccount':str(toac)})
 		
 	def _apiCoach(self):
