@@ -267,8 +267,7 @@ class Poloniex(object):
 		args['command'] = command
 		global PUBLIC_COMMANDS;global PRIVATE_COMMANDS
 		if command in PRIVATE_COMMANDS:
-			if len(self.APIKey) < 2 or len(self.Secret) < 2:
-				raise ValueError("An APIKey and Secret is needed for private api commands!")
+			if len(self.APIKey) < 2 or len(self.Secret) < 2:raise ValueError("An APIKey and Secret is needed for private api commands!")
 			args['nonce'] = int(now*42)
 			post_data = urlencode(args)
 			sign = hmac.new(self.Secret, post_data.encode('utf-8'), hashlib.sha512).hexdigest()
@@ -279,6 +278,4 @@ class Poloniex(object):
 		elif command in PUBLIC_COMMANDS:
 			ret = requests.post('https://poloniex.com/public?' + urlencode(args), timeout=self.timeout)
 			return json.loads(ret.text)
-		
-		else:
-			raise ValueError("Invalid Command!")
+		else:raise ValueError("Invalid Command!")
