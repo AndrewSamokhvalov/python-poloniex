@@ -8,4 +8,10 @@ python:
   - "3.5"
   - "3.5-dev" # 3.5 development branch
   - "nightly" # currently points to 3.6-dev
-script: nosetests
+
+install: 
+  - "sudo python setup.py install"
+
+script: 
+  - python -c "from poloniex import Poloniex;Poloniex.marketTicker()"
+  - python3 -c "from poloniex import Poloniex;Poloniex.marketTicker()"
