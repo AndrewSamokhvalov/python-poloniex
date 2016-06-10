@@ -197,9 +197,7 @@ class Poloniex(object):
 		self.APIKey = APIKey
 		self.Secret = Secret.encode('utf8')
 		self.timeout = timeout
-		self._callTimes = []
-		self._timeFrame = 1.0
-		self._callLimit = 6
+		self.apiCoach = Coach()
 		self.MINUTE, self.HOUR, self.DAY, self.WEEK, self.MONTH, self.YEAR = [60, 60*60, 60*60*24, 60*60*24*7, 60*60*24*30, 60*60*24*365]
 		# Convertions
 		self.epoch2UTCstr = lambda timestamp=time.time(), fmat="%Y-%m-%d %H:%M:%S": time.strftime(fmat, time.gmtime(timestamp))
@@ -245,7 +243,39 @@ class Poloniex(object):
 		self.returnFeeInfo = lambda x=0: self.api('returnFeeInfo')
 		self.transferBalance = lambda coin, amount, fromac, toac: self.api('transferBalance', {'currency':str(coin), 'amount':str(amount), 'fromAccount':str(fromac), 'toAccount':str(toac)})
 		
-	def _apiCoach(self):
+	
+	def api(self, command, args={}, coach=False):
+		"""
+		Main Api Function
+		- checks <command> is a vailid commmand
+		- checks for APIKey and Secret if command is 'private'
+		- returns 'False' if invalid command or if no APIKey or Secret is specified (if command is 'private')
+		- sends url encoded string to API server, returns decoded json response
+		- returns {"error":"<error message>"} if API error
+		"""
+		if coach:now = self.apiCoach.wait() # check in with the coach
+		else:now = time.time()
+		args['command'] = command
+		global PUBLIC_COMMANDS;global PRIVATE_COMMANDS
+		if command in PRIVATE_COMMANDS:
+			if len(self.APIKey) < 2 or len(self.Secret) < 2:raise ValueError("An APIKey and Secret is needed for private api commands!")
+			args['nonce'] = int(now*42)
+			post_data = urlencode(args)
+			sign = hmac.new(self.Secret, post_data.encode('utf-8'), hashlib.sha512).hexdigest()
+			headers = {'Sign': sign, 'Key': self.APIKey}
+			ret = requests.post('https://poloniex.com/tradingApi', data=args, headers=headers, timeout=self.timeout)
+			return json.loads(ret.text)
+		
+		elif command in PUBLIC_COMMANDS:
+			ret = requests.post('https://poloniex.com/public?' + urlencode(args), timeout=self.timeout)
+			return json.loads(ret.text)
+		else:raise ValueError("Invalid Command!")
+	
+class Coach(object):
+	def __init__(self, timeFrame=1.0, callLimit = 6):
+		self._timeFrame, self._callLimit, self._callTimes = [timeFrame, callLimit, []]
+	
+	def wait(self):
 		"""
 		Make sure the api calls don't go over the limit (or at least try to)...
 		"""
@@ -266,29 +296,3 @@ class Poloniex(object):
 			if len(self._callTimes) > self._callLimit: # if 'callTimes' list is larger than 'callLimit'
 				self._callTimes.pop() # remove the oldest time
 			return now
-	
-	def api(self, command, args={}):
-		"""
-		Main Api Function
-		- checks <command> is a vailid commmand
-		- checks for APIKey and Secret if command is 'private'
-		- returns 'False' if invalid command or if no APIKey or Secret is specified (if command is 'private')
-		- sends url encoded string to API server, returns decoded json response
-		- returns {"error":"<error message>"} if API error
-		"""
-		now = self._apiCoach() # check in with the coach
-		args['command'] = command
-		global PUBLIC_COMMANDS;global PRIVATE_COMMANDS
-		if command in PRIVATE_COMMANDS:
-			if len(self.APIKey) < 2 or len(self.Secret) < 2:raise ValueError("An APIKey and Secret is needed for private api commands!")
-			args['nonce'] = int(now*42)
-			post_data = urlencode(args)
-			sign = hmac.new(self.Secret, post_data.encode('utf-8'), hashlib.sha512).hexdigest()
-			headers = {'Sign': sign, 'Key': self.APIKey}
-			ret = requests.post('https://poloniex.com/tradingApi', data=args, headers=headers, timeout=self.timeout)
-			return json.loads(ret.text)
-		
-		elif command in PUBLIC_COMMANDS:
-			ret = requests.post('https://poloniex.com/public?' + urlencode(args), timeout=self.timeout)
-			return json.loads(ret.text)
-		else:raise ValueError("Invalid Command!")
