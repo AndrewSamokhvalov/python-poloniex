@@ -9,4 +9,4 @@ install:
   - python setup.py install
 
 script: 
-  - python -c "from poloniex import Poloniex;Poloniex.marketTicker()"
+  - python -c "from poloniex import Poloniex;Poloniex().marketTicker()"
