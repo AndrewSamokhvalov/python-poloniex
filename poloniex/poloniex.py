@@ -199,6 +199,7 @@ class Poloniex(object):
 		self.timeout = timeout
 		self.apiCoach = Coach()
 		self.MINUTE, self.HOUR, self.DAY, self.WEEK, self.MONTH, self.YEAR = [60, 60*60, 60*60*24, 60*60*24*7, 60*60*24*30, 60*60*24*365]
+		self.nonce = time.time()
 		# Convertions
 		self.epoch2UTCstr = lambda timestamp=time.time(), fmat="%Y-%m-%d %H:%M:%S": time.strftime(fmat, time.gmtime(timestamp))
 		self.UTCstr2epoch = lambda datestr=self.epoch2UTCstr(), fmat="%Y-%m-%d %H:%M:%S": calendar.timegm(time.strptime(datestr, fmat))
@@ -253,17 +254,17 @@ class Poloniex(object):
 		- sends url encoded string to API server, returns decoded json response
 		- returns {"error":"<error message>"} if API error
 		"""
-		if coach:now = self.apiCoach.wait() # check in with the coach
-		else:now = time.time()
+		if coach: self.apiCoach.wait() # check in with the coach
 		args['command'] = command
 		global PUBLIC_COMMANDS;global PRIVATE_COMMANDS
 		if command in PRIVATE_COMMANDS:
 			if len(self.APIKey) < 2 or len(self.Secret) < 2:raise ValueError("An APIKey and Secret is needed for private api commands!")
-			args['nonce'] = int(now*42)
+			args['nonce'] = self.nonce
 			post_data = urlencode(args)
 			sign = hmac.new(self.Secret, post_data.encode('utf-8'), hashlib.sha512).hexdigest()
 			headers = {'Sign': sign, 'Key': self.APIKey}
 			ret = requests.post('https://poloniex.com/tradingApi', data=args, headers=headers, timeout=self.timeout)
+			self.nonce+=1
 			return json.loads(ret.text)
 		
 		elif command in PUBLIC_COMMANDS:
@@ -283,16 +284,14 @@ class Coach(object):
 		print(self._callTimes)
 		if len(self._callTimes) == 0 or (now - self._callTimes[-1]) >= self._timeFrame: # if it's your turn
 			self._callTimes.insert(0, now) # add 'now' to the front of 'callTimes', pushing other times back
-			print("Now: %s  Oldest Call: %s  Diff: %f sec" % (now, self._callTimes[-1], now - self._callTimes[-1]))
+			logging.debug("Now: %s  Oldest Call: %s  Diff: %f sec" % (now, self._callTimes[-1], now - self._callTimes[-1]))
 			if len(self._callTimes) > self._callLimit: # if 'callTimes' list is larger than 'callLimit'
 				self._callTimes.pop() # remove the oldest time
-			return now
 		else:
-			print("Now: %s  Oldest Call: %s  Diff: %f sec" % (now, self._callTimes[-1], now - self._callTimes[-1]))
-			print("Waiting %s sec..." % str(self._timeFrame-(now - self._callTimes[-1])))
+			logging.debug("Now: %s  Oldest Call: %s  Diff: %f sec" % (now, self._callTimes[-1], now - self._callTimes[-1]))
+			logging.debug("Waiting %s sec..." % str(self._timeFrame-(now - self._callTimes[-1])))
 			time.sleep(self._timeFrame-(now - self._callTimes[-1])) # wait your turn... (maxTime - (now - oldest)) = time left to wait
 			now = time.time() # look at watch, again...
 			self._callTimes.insert(0, now) # add 'now' to the front of 'callTimes', pushing other times back
 			if len(self._callTimes) > self._callLimit: # if 'callTimes' list is larger than 'callLimit'
 				self._callTimes.pop() # remove the oldest time
-			return now
