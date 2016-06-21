@@ -23,7 +23,7 @@ logging.basicConfig(format='[%(asctime)s]%(message)s', datefmt="%H:%M:%S", level
 
 class Loaner(object):
 	""" Object for control of threaded Loaner loop"""
-	def __init__(self, Key, Secret, interval=60*2, ageLimit=60*5, offset=2):
+	def __init__(self, Key, Secret, interval=60*60, ageLimit=60*60*3, offset=4):
 		"""
 		- <Key> - Polo Api key
 		- <Secret> - Polo Api secret
@@ -34,7 +34,10 @@ class Loaner(object):
 		- Loaner.MINAMOUNT = Minimum amount for creating loan offers [default= 0.01]
 		"""
 		self.POLO = Poloniex(Key, Secret)
+		self._checkInt = int(interval/60)*5
+		
 		self.INTERVAL, self.AGELIMIT, self.OFFSET, self.CHECKINT, self.MINAMOUNT, self._running, self._thread = [interval, ageLimit, offset, 20, 0.01, False, None]
+		
 	
 	def _run(self):
 		""" Main loop that is threaded (set Loaner.RUNNING to 'False' to stop loop)"""
@@ -42,11 +45,11 @@ class Loaner(object):
 			try:
 				self.cancelOldLoans(self.POLO.myOpenLoanOrders(), self.AGELIMIT)
 				self.createLoans(self.POLO.myAvailBalances(), self.OFFSET)
-				for i in range(self.CHECKINT):
+				for i in range(self._checkInt):
 					if not self._running: break
-					time.sleep(self.INTERVAL/self.CHECKINT)
+					time.sleep(self.INTERVAL/self._checkInt)
 			except Exception as e:
-				logging.info(e);time.sleep(self.INTERVAL/self.CHECKINT)
+				logging.info(e);time.sleep(self.INTERVAL/self._checkInt)
 	
 	def start(self):
 		""" Start Loaner.thread"""
@@ -66,7 +69,7 @@ class Loaner(object):
 		logging.info('LOANER: Checking for stale offers')
 		for market in orderList:
 			for order in orderList[market]:
-				logging.info('LOANER: %s order %s has been open %f2 mins' % (market, str(order['id']), round((time.time()-self.POLO.UTCstr2epoch(order['date']))/60, 2)))
+				logging.info('LOANER: %s order %s has been open %d mins' % (market, str(order['id']), (time.time()-self.POLO.UTCstr2epoch(order['date']))/60))
 				if time.time()-self.POLO.UTCstr2epoch(order['date']) > ageLimit:
 					result = self.POLO.cancelLoanOrder(order['id'])
 					if not 'error' in result: logging.info('LOANER: %s %s [%s]' % (market, result["message"].lower(), str(order['id'])))
@@ -75,9 +78,9 @@ class Loaner(object):
 	def createLoans(self, balances, offset):
 		""" Create loans for all markets in <balances> at the <offset> from the top rate
 			- balances = JSON object received from poloniex (available balances)
-			- offset = number of 'loanToshis' to offset from the top loan order (offset*0.000001)""" 
+			- offset = number of 'loanToshis' to offset from the top loan order (offset*0.000001)"""
+		logging.info('LOANER: Checking for coins in lending account')
 		if 'lending' in balances:
-			logging.info('LOANER: Checking for coins in lending account')
 			for market in balances['lending']:
 				if float(balances['lending'][market]) > self.MINAMOUNT:
 					result = self.POLO.createLoanOrder(market, balances['lending'][market], float(self.POLO.marketLoans(market)['offers'][0]['rate'])+(offset*0.000001))
