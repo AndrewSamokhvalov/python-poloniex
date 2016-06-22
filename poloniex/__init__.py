@@ -114,9 +114,6 @@ class Poloniex(object):
 		self.marketChart(pair, period=self.DAY, start=time.time()-self.YEAR, end=time.time()) == self.api('returnChartData', {'currencyPair':<pair>, 'period':[period=self.DAY], 'start':[start=time.time()-self.YEAR], 'end':[end=time.time()]})
 		- returns chart data for <pair> with a candle period of [period=self.DAY] starting from [start=time.time()-self.YEAR] and ending at [end=time.time()]
 		
-		self.marketTradeHist(pair, start, end) == json.loads(urlopen(Request('https://poloniex.com/public?'+urlencode({'command':'returnTradeHistory', 'currencyPair':<pair>, 'start':<start>, 'end':[end=time.time()]}))).read().decode(encoding='UTF-8'))		
-		- returns trade public trade history for <pair> starting at <start> and ending at [end=time.time()]
-		
 		# Private-------------------------
 		self.myTradeHist(pair) == self.api('returnTradeHistory',{'currencyPair':<pair>})
 		- returns your private trade history for <pair>
@@ -220,7 +217,6 @@ class Poloniex(object):
 		self.marketLoans = lambda coin: self.api('returnLoanOrders',{'currency':str(coin)})
 		self.marketOrders = lambda pair='all', depth=20: self.api('returnOrderBook', {'currencyPair':str(pair), 'depth':str(depth)})
 		self.marketChart = lambda pair, period=self.DAY, start=time.time()-self.YEAR, end=time.time(): self.api('returnChartData', {'currencyPair':str(pair), 'period':str(period), 'start':str(start), 'end':str(end)})
-		self.marketTradeHist = lambda pair, start, end=time.time(): json.loads(urlopen(request('https://poloniex.com/public?'+urlencode({'command':'returnTradeHistory', 'currencyPair':str(pair), 'start':str(start), 'end':str(end)}))).read().decode(encoding='UTF-8'))		
 		#PRIVATE COMMANDS
 		self.myTradeHist = lambda pair: self.api('returnTradeHistory',{'currencyPair':str(pair)})
 		self.myBalances = lambda x=0: self.api('returnBalances')
@@ -234,6 +230,7 @@ class Poloniex(object):
 		self.myTradeableBalances = lambda x=0: self.api('returnTradableBalances')
 		self.myActiveLoans = lambda x=0: self.api('returnActiveLoans')
 		self.myOpenLoanOrders = lambda x=0: self.api('returnOpenLoanOffers')
+		
 		## Trading functions ##
 		self.orderTrades = lambda orderId: self.api('returnOrderTrades',{'orderNumber':str(orderId)})
 		self.createLoanOrder = lambda coin, amount, rate: self.api('createLoanOffer', {'currency' :str(coin), 'amount':str(amount), 'duration':str(2), 'autoRenew':str(0), 'lendingRate':str(rate)})
@@ -249,7 +246,20 @@ class Poloniex(object):
 		self.withdraw = lambda coin, amount, address: self.api('withdraw', {'currency':str(coin), 'amount':str(amount), 'address':str(address)})
 		self.returnFeeInfo = lambda x=0: self.api('returnFeeInfo')
 		self.transferBalance = lambda coin, amount, fromac, toac: self.api('transferBalance', {'currency':str(coin), 'amount':str(amount), 'fromAccount':str(fromac), 'toAccount':str(toac)})
-			
+	
+	def marketTradeHist(self, pair, start, end=time.time()):
+		"""
+		- returns trade public trade history for <pair> starting at <start> and ending at [end=time.time()]
+		"""
+		try:
+			if self._locking: self._lock.acquire() # block threads
+			if self._coaching: self.apiCoach.wait()
+			ret = requests.post('https://poloniex.com/public?'+urlencode({'command':'returnTradeHistory', 'currencyPair':str(pair), 'start':str(start), 'end':str(end)}), timeout=self.timeout)
+			return json.loads(ret.text)
+		except Exception as e:raise e
+		finally:
+			if self._locking:self._lock.release() # release threads
+				
 	def api(self, command, args={}):
 		"""
 		Main Api Function
