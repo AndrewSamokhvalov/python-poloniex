@@ -171,7 +171,7 @@ class Poloniex(object):
 		
 		self.marginSell(pair, rate, amount, lendingRate=2) == self.api('marginSell', {'currencyPair':<pair>, 'rate':<rate>, 'amount':<amount>, 'lendingRate':[lendingRate=2]})
 		- creates a margin sell order for <pair> at <rate> for <amount> with [lendingRate=2]%
-				
+		
 		self.buy(pair, rate, amount) == self.api('buy', {'currencyPair':<pair>, 'rate':<rate>, 'amount':<amount>})
 		- creates buy order for <pair> at <rate> for <amount>
 		
@@ -186,7 +186,7 @@ class Poloniex(object):
 		
 		self.withdraw(coin, amount, address) == self.api('withdraw', {'currency':<coin>, 'amount':<amount>, 'address':<address>})
 		- withdraws <coin> <amount> to <address>
-
+		
 		self.returnFeeInfo() == self.api('returnFeeInfo')
                 - return current trading fees and trailing 30-day volume in BTC
 		
@@ -230,7 +230,6 @@ class Poloniex(object):
 		self.myTradeableBalances = lambda x=0: self.api('returnTradableBalances')
 		self.myActiveLoans = lambda x=0: self.api('returnActiveLoans')
 		self.myOpenLoanOrders = lambda x=0: self.api('returnOpenLoanOffers')
-		
 		## Trading functions ##
 		self.orderTrades = lambda orderId: self.api('returnOrderTrades',{'orderNumber':str(orderId)})
 		self.createLoanOrder = lambda coin, amount, rate: self.api('createLoanOffer', {'currency' :str(coin), 'amount':str(amount), 'duration':str(2), 'autoRenew':str(0), 'lendingRate':str(rate)})
@@ -249,7 +248,7 @@ class Poloniex(object):
 	
 	def marketTradeHist(self, pair, start, end=time.time()):
 		"""
-		- returns trade public trade history for <pair> starting at <start> and ending at [end=time.time()]
+		- returns public trade history for <pair> starting at <start> and ending at [end=time.time()]
 		"""
 		try:
 			if self._locking: self._lock.acquire() # block threads
@@ -297,7 +296,7 @@ class Poloniex(object):
 		
 		else:raise ValueError("Invalid Command!")
 	
-	
+
 class Coach(object):
 		"""
 		Coaches the api wrapper, to make sure it doesn't get all hyped up on Mt.Dew and go over Poloniex api call limit.
