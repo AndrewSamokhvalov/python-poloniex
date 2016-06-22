@@ -51,12 +51,16 @@ PRIVATE_COMMANDS = [
 
 class Poloniex(object):
 	"""The Poloniex Object!"""
-	def __init__(self, APIKey='', Secret='', timeout=3, loglevel=logging.WARNING):
+	def __init__(self, APIKey='', Secret='', timeout=3, coach=False, lock=False, loglevel=logging.WARNING,):
 		"""
 		self.APIKey = api key supplied by Poloniex
 		self.Secret = secret hash supplied by Poloniex
 		self.timeout = time in sec to wait for an api response (otherwise 'requests.exceptions.Timeout')
-		
+		self.apiCoach = object that regulates spacing between api calls
+		self._coaching = bool to indicate if the api coach should be used
+		self._lock = multiprocessing lock
+		self._locking = bool to indicate if a thread lock should be used
+		[loglevel] = a logging level to set the module at (changes the requests module as well)
 		
 		# Time Placeholders # (MONTH == 30*DAYS)
 		
@@ -199,8 +203,8 @@ class Poloniex(object):
 		logging.getLogger("urllib3").setLevel(loglevel)
 		# Call coach, set nonce, create thread lock
 		self.apiCoach, self.nonce, self._lock = [Lock(), Coach(), int(time.time())]
-		# Grab keys, set timeout
-		self.APIKey, self.Secret, self.timeout  = [APIKey, Secret.encode('utf8'), timeout]
+		# Grab keys, set timeout, dich coach?
+		self.APIKey, self.Secret, self.timeout, self._coaching, self._locking = [APIKey, Secret.encode('utf8'), timeout, coach, lock]
 		# Set time labels
 		self.MINUTE, self.HOUR, self.DAY, self.WEEK, self.MONTH, self.YEAR = [60, 60*60, 60*60*24, 60*60*24*7, 60*60*24*30, 60*60*24*365]
 		# Convertions
@@ -246,15 +250,14 @@ class Poloniex(object):
 		self.returnFeeInfo = lambda x=0: self.api('returnFeeInfo')
 		self.transferBalance = lambda coin, amount, fromac, toac: self.api('transferBalance', {'currency':str(coin), 'amount':str(amount), 'fromAccount':str(fromac), 'toAccount':str(toac)})
 			
-	def api(self, command, args={}, coach=False):
+	def api(self, command, args={}):
 		"""
 		Main Api Function
 		- encodes and sends <command> with optional [args] to Poloniex api
-		- raises 'ValueError' if an api key or secret is missing, or if the <command> is not valid
-		- optional api coach can be activated using 'coach=True' arg
+		- raises 'ValueError' if an api key or secret is missing (and the command is 'private'), or if the <command> is not valid
 		"""
-		self._lock.acquire() # block threads
-		if coach: self.apiCoach.wait() # check in with the coach
+		if self._locking: self._lock.acquire() # block threads
+		if self._coaching: self.apiCoach.wait() # check in with the coach
 		args['command'] = command # pass the command
 		
 		global PUBLIC_COMMANDS;global PRIVATE_COMMANDS
@@ -272,7 +275,7 @@ class Poloniex(object):
 			except Exception as e:raise e
 			finally:
 				self.nonce+=1 # increment nonce
-				self._lock.release() # release threads
+				if self._locking: self._lock.release() # release threads
 		
 		elif command in PUBLIC_COMMANDS: # public?
 			try:
@@ -280,7 +283,7 @@ class Poloniex(object):
 				return json.loads(ret.text)
 			except Exception as e:raise e
 			finally:
-				self._lock.release()
+				if self._locking: self._lock.release() # release threads
 		
 		else:raise ValueError("Invalid Command!")
 	
