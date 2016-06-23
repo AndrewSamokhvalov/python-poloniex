@@ -51,15 +51,13 @@ PRIVATE_COMMANDS = [
 
 class Poloniex(object):
 	"""The Poloniex Object!"""
-	def __init__(self, APIKey='', Secret='', timeout=3, coach=False, lock=False, loglevel=logging.WARNING,):
+	def __init__(self, APIKey='', Secret='', timeout=3, coach=False, loglevel=logging.WARNING,):
 		"""
 		self.APIKey = api key supplied by Poloniex
 		self.Secret = secret hash supplied by Poloniex
 		self.timeout = time in sec to wait for an api response (otherwise 'requests.exceptions.Timeout')
 		self.apiCoach = object that regulates spacing between api calls
 		self._coaching = bool to indicate if the api coach should be used
-		self._lock = multiprocessing lock
-		self._locking = bool to indicate if a thread lock should be used
 		[loglevel] = a logging level to set the module at (changes the requests module as well)
 		
 		# Time Placeholders # (MONTH == 30*DAYS)
@@ -199,9 +197,9 @@ class Poloniex(object):
 		logging.getLogger("requests").setLevel(loglevel)
 		logging.getLogger("urllib3").setLevel(loglevel)
 		# Call coach, set nonce, create thread lock
-		self.apiCoach, self.nonce, self._lock = [Lock(), Coach(), int(time.time())]
-		# Grab keys, set timeout, dich coach?
-		self.APIKey, self.Secret, self.timeout, self._coaching, self._locking = [APIKey, Secret.encode('utf8'), timeout, coach, lock]
+		self.apiCoach, self.nonce = [Coach(), int(time.time())]
+		# Grab keys, set timeout, ditch coach?
+		self.APIKey, self.Secret, self.timeout, self._coaching = [APIKey, Secret.encode('utf8'), timeout, coach]
 		# Set time labels
 		self.MINUTE, self.HOUR, self.DAY, self.WEEK, self.MONTH, self.YEAR = [60, 60*60, 60*60*24, 60*60*24*7, 60*60*24*30, 60*60*24*365]
 		# Convertions
@@ -251,21 +249,17 @@ class Poloniex(object):
 		- returns public trade history for <pair> starting at <start> and ending at [end=time.time()]
 		"""
 		try:
-			if self._locking: self._lock.acquire() # block threads
 			if self._coaching: self.apiCoach.wait()
 			ret = requests.post('https://poloniex.com/public?'+urlencode({'command':'returnTradeHistory', 'currencyPair':str(pair), 'start':str(start), 'end':str(end)}), timeout=self.timeout)
 			return json.loads(ret.text)
 		except Exception as e:raise e
-		finally:
-			if self._locking:self._lock.release() # release threads
-				
+	
 	def api(self, command, args={}):
 		"""
 		Main Api Function
 		- encodes and sends <command> with optional [args] to Poloniex api
 		- raises 'ValueError' if an api key or secret is missing (and the command is 'private'), or if the <command> is not valid
 		"""
-		if self._locking: self._lock.acquire() # block threads
 		if self._coaching: self.apiCoach.wait() # check in with the coach
 		args['command'] = command # pass the command
 		
@@ -284,16 +278,12 @@ class Poloniex(object):
 			except Exception as e:raise e
 			finally:
 				self.nonce+=1 # increment nonce
-				if self._locking: self._lock.release() # release threads
-		
+			
 		elif command in PUBLIC_COMMANDS: # public?
 			try:
 				ret = requests.post('https://poloniex.com/public?' + urlencode(args), timeout=self.timeout)
 				return json.loads(ret.text)
 			except Exception as e:raise e
-			finally:
-				if self._locking: self._lock.release() # release threads
-		
 		else:raise ValueError("Invalid Command!")
 	
 
